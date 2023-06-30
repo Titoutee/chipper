@@ -1,3 +1,5 @@
+use chipper::chip8;
+
 fn main() {
-    print!("Hey");
+    ()
 }

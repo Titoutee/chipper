@@ -1,15 +1,18 @@
-use super::memory;
-
-pub const WIDTH: u8 = 64;
-pub const HEIGHT: u8 = 32;
+use super::memory::{Registers, Stack, Mem};
 
 pub struct CPU {
     // Some registers
-    register: Registers,
+    registers: Registers,
 
     // A stack
-    stack: [u16; 16],
+    stack: Stack, // independant from main ram
 
-    // Video Random Access Memory
-    vram: [u16; HEIGHT*WIDTH],
+    // Mem
+    mem: Mem,
+
+    // VRAM
+    //vram: Vram,
+
+    //Keypad
+    //keypad: Keypad,
 }
