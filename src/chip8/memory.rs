@@ -10,6 +10,8 @@ const RAM_SIZE: usize = 0x1000; // 4096
 const FONTS_BASE_ADDR: usize = 0x000; // Base adress for fonts in RAM
 //const FONTS_LIM_ADDR: usize = 0x04F;
 const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
+
+#[derive(Default)]
 /// A set of registers, likely to be owned by a CPU
 pub struct Registers {
     // Generl purpose regs, which can be written to and read from (VF is not accessible from programs though)
@@ -30,10 +32,6 @@ pub struct Stack {
 }
 
 impl Stack {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn push(&mut self, val: u16) -> Option<()>/*FULL*/ {
         self.vec[self.sp as usize] = val;
         if self.sp+1 > 16 {
@@ -52,6 +50,7 @@ impl Stack {
     }
 }
 
+#[derive(Debug)]
 /// Main memory unit
 pub struct Mem {
     ram: [u8; RAM_SIZE], // Main RAM
