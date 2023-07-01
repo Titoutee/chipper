@@ -1,4 +1,4 @@
-use super::memory::{Registers, Stack, Mem};
+use super::memory::{Registers, Mem, Stack};
 
 pub struct CPU {
     // Some registers
@@ -16,3 +16,6 @@ pub struct CPU {
     //Keypad
     //keypad: Keypad,
 }
+
+
+impl 

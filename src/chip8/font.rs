@@ -1,7 +1,6 @@
 const FONTS_NUM: usize = 16;
 const FONT_UNIT_SIZE: usize = 5; // In bytes
 
-
 pub const FONT_SET: [u8; FONT_UNIT_SIZE * FONTS_NUM] = [
     0xF0,
     0x90,
