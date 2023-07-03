@@ -9,10 +9,8 @@ fn main() {
 
     let mut file = File::open(filename).unwrap();
     let mut rom = Vec::new();
-    if let Err(err) = file.read_to_end(&mut rom) {
+    if let Err(err) = file.read_to_end(&mut rom) { // Fit in ram is checked in rom loading
         panic!("An error occured: {}", err);
     }
-
-    let mut main_mem: Mem = Mem::new(rom);
-    println!("{:?}", main_mem);
+    println!("{}", 253/2);
 }

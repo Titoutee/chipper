@@ -4,49 +4,52 @@ use std::fmt::Display;
 use super::display::{Sprite};
 use super::font::FONT_SET;
 
-const STACK_SIZE: u8 = 16;
-const RAM_SIZE: usize = 0x1000; // 4096
+const STACK_SIZE: usize = 16;
+pub const RAM_SIZE: usize = 0x1000; // 4096
 
 const FONTS_BASE_ADDR: usize = 0x000; // Base adress for fonts in RAM
-//const FONTS_LIM_ADDR: usize = 0x04F;
-const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
+//const FONTS_LIM_ADDR: usize = 0x0F;
+pub const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 /// A set of registers, likely to be owned by a CPU
 pub struct Registers {
     // Generl purpose regs, which can be written to and read from (VF is not accessible from programs though)
-    v: [u8; 16],
+    pub v: [u8; 16],
     // A special adress holding reg (as RAM is 4KB, only the 12 lower bits are used (max value = 4095))
-    i: u16,
+    pub i: u16,
     // CPU private regs
-    pc: u16, // Program Counter
+    pub pc: u16, // Program Counter
     // Timer registers: they are decremented at a 60Hz rate
-    dt: u8, // Delay Timer
-    st: u8, // Sound timer -> active whenever it's not 0
+    pub dt: u8, // Delay Timer
+    pub st: u8, // Sound timer -> active whenever it's not 0
 }
 
-#[derive(Default)]
+#[derive(Debug)]
 pub struct Stack {
     vec: Vec<u16>, // Default: all 0
-    sp: u8, // Default: 0 -> empty stack
 }
 
 impl Stack {
     pub fn push(&mut self, val: u16) -> Option<()>/*FULL*/ {
-        self.vec[self.sp as usize] = val;
-        if self.sp+1 > 16 {
+        if self.vec.len()+1 > STACK_SIZE {
             return None;
         }
-        self.sp+=1;
+        self.vec.push(val);
         Some(())
     }
 
-    pub fn pop(&mut self) -> Option<()> {
-        if self.sp > 1 {
-            return None;
+    pub fn pop(&mut self) -> Option<u16> { // Responsability of the caller to handle the empty stack
+        self.vec.pop()
+    }
+}
+
+impl Default for Stack {
+    fn default() -> Self {
+        Self {
+            vec: Vec::with_capacity(STACK_SIZE as usize),
+            //sp: 0,
         }
-        self.sp+=1;
-        return Some(())
     }
 }
 
@@ -54,7 +57,7 @@ impl Stack {
 /// Main memory unit
 pub struct Mem {
     ram: [u8; RAM_SIZE], // Main RAM
-    rom: Vec<u8>,        // Embedded instructions, wich will be included in RAM
+    pub rom: Vec<u8>,        // Embedded instructions, wich will be included in RAM
 }
 
 impl Mem {
@@ -90,28 +93,27 @@ impl Mem {
     }
 
     /// Reads the byte at the given address in ram
-    pub fn read_byte(&self, addr: usize) -> u8 {
-        self.ram[addr]
+    pub fn read_byte(&self, addr: usize) -> Option<u8> {
+        if addr >= RAM_SIZE {
+            return None
+        }
+        Some(self.ram[addr])
     }
 
     /// Writes over the byte at the given address in ram
     pub fn write_byte(&mut self, addr: usize, val: u8) {
-        self.ram[addr] = val;
+        if addr < RAM_SIZE {
+            self.ram[addr] = val;
+        }
     }
     
     /// Reads a complete word (2-byte in CHIP-8) from ram beginning at addr
     // Two consecutive regs (addr and addr + 1) are OR'd and yield a new u16
-    pub fn read_word(&self, addr: usize) -> u16 {
-        ((self.ram[addr] as u16) << 8) | (self.ram[addr+1] as u16)
-    }
-
-    // Shouldn't be useful, as words are instructions and are supposed to be only read
-    pub fn write_word(&mut self, addr: usize, val: u16) {
-        let mask = 0b00000000;
-        let a = ((val>>8) | mask) as u8;
-        let b = ((val<<8>>8) | mask) as u8;
-        self.ram[addr] = a ;
-        self.ram[addr+1] = b;
+    pub fn read_word(&self, addr: usize) -> Option<u16> {
+        if addr >= RAM_SIZE || addr + 1 >= RAM_SIZE {
+            return None
+        }
+        Some(((self.ram[addr] as u16) << 8) | (self.ram[addr+1] as u16))
     }
 }
 
@@ -119,7 +121,39 @@ impl Mem {
 mod tests {
     use crate::chip8::font::FONT_SET;
 
-    use super::{Mem};
+    use super::{Mem, Stack};
+
+    #[test]
+    fn stack_push_valid() {
+        let mut stack = Stack::default();
+        stack.push(1).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn stack_push_valid_invalid() {
+        let mut stack = Stack::default();
+        let very_high_lim = 100;
+        for _ in 0..very_high_lim {
+            stack.push(1).unwrap();
+        }
+    }
+
+    #[test]
+    fn stack_pop_valid() {
+        let mut stack = Stack::default();
+        stack.push(1).unwrap();
+        //test
+        let popped = stack.pop().unwrap();
+        assert_eq!(popped, 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn stack_pop_invalid() {
+        let mut stack = Stack::default();
+        let popped = stack.pop().unwrap();
+    }
 
     fn mem_setup() -> Mem {
         Mem::new(vec![])
@@ -146,7 +180,7 @@ mod tests {
     #[test]
     fn word_read_valid() {
         let mem = mem_setup_filled(vec![4, 4, 3, 4]);
-        assert_eq!(mem.read_word(0), 61584);
+        assert_eq!(mem.read_word(0).expect("Out of bounds"), 61584);
     }
 
     #[test]
@@ -154,26 +188,6 @@ mod tests {
     fn word_read_invalid() {
         let invalid_addr = 4096;
         let mem = mem_setup_filled(vec![4, 4, 3, 4]); 
-        assert_eq!(mem.read_word(invalid_addr), 61584);
-    }
-
-    #[test]
-    fn word_write_valid() {
-        let mut mem = mem_setup(); // We don't care about rom here (empty)
-        let val: u16 = 0b1000001000000011;
-        println!("{}", val);
-        mem.write_word(0, val);
-        println!("{:?}", mem.ram);
-    }
-
-    #[test]
-    #[should_panic]
-    fn word_write_invalid() {
-        let invalid_addr = 4096;
-        let mut mem = mem_setup(); // We don't care about rom here (empty)
-        let val: u16 = 0b1000001000000011;
-        println!("{}", val);
-        mem.write_word(invalid_addr, val);
-        println!("{:?}", mem.ram);
+        assert_eq!(mem.read_word(invalid_addr).expect("out of bounds"), 61584);
     }
 }

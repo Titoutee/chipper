@@ -1,21 +1,19 @@
-use std::arch::x86_64::CpuidResult;
+use core::panic;
 
-use super::memory::{Registers, Mem, Stack};
+use super::display::{Vram, SPRITE_SIZE, VRAM_DEF, VRAM_HEIGHT, VRAM_WIDTH};
+use super::memory::{self, Mem, Registers, Stack};
+use rand::{self, Rng};
 
+#[derive(Debug)]
 pub struct CPU {
-    // Some registers
+    // Some useful registers
     registers: Registers,
-
     // A stack
     stack: Stack, // independant from main ram
-
     // Mem
     mem: Mem,
-
-    // VRAM
-    //vram: Vram,
-
-    //Keypad
+    // Vram
+    vram: Vram,
     //keypad: Keypad,
 }
 
@@ -24,19 +22,189 @@ impl CPU {
         let mut cpu = Self {
             registers: Registers::default(),
             stack: Stack::default(),
+            vram: Vram::default(),
             mem,
         };
-        cpu.reset(); // Main use 
+        cpu.reset(); // Just for mem and pc reinit.
         cpu
     }
 
     pub fn reset(&mut self) {
         self.registers = Registers::default();
         self.stack = Stack::default();
+        self.vram = Vram::default();
         self.mem.reset();
+        self.registers = Registers {
+            pc: memory::ROM_BASE_ADDR as u16,
+            ..Default::default()
+        } // Ram gets reinitialized (rom, fonts)
     }
 
-    pub fn execute() {
+    // Provide no load_rom method, as this will be redundant (parent chip8 will though, for practical use)
 
+    pub fn fetch(&self) -> Option<u16> {
+        let pc = self.registers.pc as usize;
+        self.mem.read_word(pc)
     }
+
+    fn bad_opcode(&self, opcode: u16) {
+        panic!("Received an invalid opcode in source code: {:X?}", opcode);
+    }
+
+    pub fn execute(&mut self) {
+        let instruction = self.fetch().expect("Out of bounds word reading"); // We get the
+
+        //Cut the instruction on parts
+        let nnn = instruction & 0x0FFF;
+        let kk = (instruction & 0x00FF) as u8;
+        let n = (instruction & 0x000F) as u8; // 4 bits are unused
+        let x = ((instruction & 0x0F00) >> 8) as usize;
+        let y = ((instruction & 0x00F0) >> 4) as usize;
+
+        if x > 0xF || y > 0xF {
+            // Vx regs are 16 long
+            panic!("Ill formed x and y indexes...");
+        }
+
+        let first_bit = ((instruction & 0xF000) >> 12) as u8;
+        //println!("{}", first_bit);
+        //(nnn, kk, n, x, y)
+
+        match first_bit {
+            0x0 => match kk {
+                0xE0 => self.vram.clear(),
+
+                0xEE => {
+                    self.registers.pc = self
+                        .stack
+                        .pop()
+                        .expect("Stack was empty already, ill-formed function nesting")
+                }
+
+                any => self.bad_opcode(any as u16),
+            },
+
+            0x1 => self.registers.pc = nnn,
+
+            0x2 => {
+                self.stack
+                    .push(self.registers.pc)
+                    .expect("Program tried to overflow its stack");
+                self.registers.pc = nnn;
+            }
+            0x3 => {
+                if self.registers.v[x] == kk {
+                    self.registers.pc += 2;
+                }
+            }
+            0x4 => {
+                if self.registers.v[x] != kk {
+                    self.registers.pc += 2;
+                }
+            }
+            0x5 => {
+                if self.registers.v[x] == self.registers.v[y] {
+                    self.registers.pc += 2;
+                }
+            }
+            0x6 => self.registers.v[x] = kk,
+            0x7 => {
+                let addition = self.registers.v[x] as u16 + kk as u16; // Removes overflow
+                self.registers.v[x] = addition as u8;
+            }
+            0x8 => {
+                match n {
+                    0x0 => self.registers.v[x] = self.registers.v[y],
+                    0x1 => self.registers.v[x] |= self.registers.v[y],
+                    0x2 => self.registers.v[x] &= self.registers.v[y],
+                    0x3 => self.registers.v[x] ^= self.registers.v[y],
+                    0x4 => {
+                        let addition = self.registers.v[x] as u16 + self.registers.v[y] as u16;
+                        self.registers.v[x] = addition as u8;
+                        self.registers.v[0xF] = (addition > 0xFF/*255*/) as u8;
+                    }
+                    0x5 => {
+                        self.registers.v[0xF] = (self.registers.v[x] > self.registers.v[y]) as u8;
+                        self.registers.v[x] = self.registers.v[x].wrapping_sub(self.registers.v[y]);
+                    }
+                    0x6 => {
+                        self.registers.v[0xF] = self.registers.v[x] & 0b1; // LSb
+                        self.registers.v[x] /= 2;
+                    }
+                    0x7 => {
+                        self.registers.v[0xF] = (self.registers.v[y] > self.registers.v[x]) as u8;
+                        self.registers.v[x] = self.registers.v[y].wrapping_sub(self.registers.v[x]);
+                    }
+                    0xE => {
+                        self.registers.v[0xF] = self.registers.v[x] & 0b10000000; // MSb
+                        self.registers.v[x] *= 2;
+                    }
+                    any => self.bad_opcode(any as u16),
+                }
+            }
+            0x9 => {
+                if self.registers.v[x] != self.registers.v[y] {
+                    self.registers.pc += 2;
+                }
+            }
+            0xA => self.registers.i = nnn,
+            0xB => self.registers.pc = nnn + (self.registers.v[0] as u16),
+            0xC => {
+                let random: u8 = rand::thread_rng().gen(); // 0-255
+                self.registers.v[x] = random & kk;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::memory::ROM_BASE_ADDR;
+    use super::CPU;
+    use super::{VRAM_HEIGHT, VRAM_WIDTH};
+    use crate::chip8::display::VRAM_DEF;
+    use crate::chip8::memory::Mem;
+
+    fn cpu_setup() -> CPU {
+        CPU::new(Mem::new(Vec::from([1, 2, 3, 4]))) // Main setup with all default, but mem's rom (and ram) is filled with 4 bytes
+    }
+
+    #[test]
+    fn cpu_new() {
+        let cpu = cpu_setup();
+        assert_eq!(cpu.vram.inner(), VRAM_DEF);
+        println!("{:?}", cpu.mem);
+        println!("{:?}", cpu.registers);
+        println!("{:?}", cpu.stack);
+        let rom = [1, 2, 3, 4];
+        let mut basket = Vec::with_capacity(4);
+        for i in 0..4 {
+            basket.push(cpu.mem.read_byte(ROM_BASE_ADDR + i).unwrap());
+        }
+        assert_eq!(Vec::from(rom), basket);
+    }
+
+    #[test]
+    fn cpu_reset() {
+        let mut cpu = cpu_setup();
+        cpu.reset();
+        assert_eq!(cpu.mem.rom, Vec::from([1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn cpu_fetch() {
+        let mut cpu = cpu_setup();
+        let instr = cpu.fetch().unwrap();
+        assert_eq!(instr, 258);
+        cpu.registers.pc += 1;
+        let instr = cpu.fetch().unwrap();
+        assert_eq!(instr, 515);
+    }
+
+    //#[test]
+    //fn cpu_execute() {
+    //    let mut cpu = cpu_setup(); // rom: [1, 2, 3, 4]
+    //    //word(1, 2) = 258 (u16)
+    //    cpu.execute();
+    //}
 }
