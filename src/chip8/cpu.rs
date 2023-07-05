@@ -1,6 +1,6 @@
 use core::panic;
 
-use super::display::{Vram, SPRITE_MAX_SIZE, VRAM_DEF, VRAM_HEIGHT, VRAM_WIDTH, Sprite};
+use super::display::{Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH, Sprite};
 use super::memory::{self, Mem, Registers, Stack};
 use rand::{self, Rng};
 
@@ -182,7 +182,7 @@ mod test {
     use super::memory::ROM_BASE_ADDR;
     use super::CPU;
     use super::{VRAM_HEIGHT, VRAM_WIDTH};
-    use crate::chip8::display::VRAM_DEF;
+    use crate::chip8::display::VRAM_DEFAULT;
     use crate::chip8::memory::Mem;
 
     fn cpu_setup() -> CPU {
@@ -192,7 +192,7 @@ mod test {
     #[test]
     fn cpu_new() {
         let cpu = cpu_setup();
-        assert_eq!(cpu.vram.inner(), VRAM_DEF);
+        assert_eq!(cpu.vram.inner(), VRAM_DEFAULT);
         println!("{:?}", cpu.mem);
         println!("{:?}", cpu.registers);
         println!("{:?}", cpu.stack);
