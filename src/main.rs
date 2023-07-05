@@ -1,5 +1,6 @@
 use chipper::chip8::{cpu::{CPU}, memory::{Mem}};
 use std::{env, fs::File, io::Read};
+use minifb::{Window, Key, WindowOptions, Menu};
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = match args.get(1) {
@@ -12,5 +13,10 @@ fn main() {
     if let Err(err) = file.read_to_end(&mut rom) { // Fit in ram is checked in rom loading
         panic!("An error occured: {}", err);
     }
-    println!("{}", 253/2);
+    let mut window = Window::new("CHIP-8 Emulator", 640, 320, WindowOptions::default()).unwrap();
+    window.set_title("CHIP-8 Emulator");
+    let menu = Menu::new("CHIP-8 menu").unwrap();
+    //while window.is_open() {
+    //    window.update();
+    //}
 }

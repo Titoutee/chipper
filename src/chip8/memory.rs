@@ -106,6 +106,14 @@ impl Mem {
             self.ram[addr] = val;
         }
     }
+
+    pub fn read_segment(&self, n_bytes: usize, addr: usize) -> Option<Vec<u8>> {
+        let mut segment = Vec::<u8>::new();
+        for offset in 0..n_bytes {
+            segment.push(self.read_byte(addr+offset)?);
+        }
+        Some(segment)
+    }  
     
     /// Reads a complete word (2-byte in CHIP-8) from ram beginning at addr
     // Two consecutive regs (addr and addr + 1) are OR'd and yield a new u16
@@ -189,5 +197,18 @@ mod tests {
         let invalid_addr = 4096;
         let mem = mem_setup_filled(vec![4, 4, 3, 4]); 
         assert_eq!(mem.read_word(invalid_addr).expect("out of bounds"), 61584);
+    }
+
+    #[test]
+    fn word_read_segment_valid() {
+        let mem = mem_setup_filled(vec![4, 4, 3, 4]);
+        assert_eq!(mem.read_segment(5, 4000).unwrap(), vec![0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn word_read_segment_invalid() {
+        let mem = mem_setup_filled(vec![4, 4, 3, 4]);
+        assert_eq!(mem.read_segment(5, 4095).unwrap(), vec![0, 0, 0, 0, 0]);
     }
 }
