@@ -1,7 +1,6 @@
 //! Display API
 
-use super::utils::bits_from_u8;
-
+use std::{ops::BitOrAssign, fmt::Display};
 pub const SPRITE_MAX_SIZE: usize = 15;
 pub const VRAM_WIDTH: usize = 64;
 pub const VRAM_HEIGHT: usize = 32;
@@ -75,32 +74,63 @@ impl Vram {
         None
     }
     
-    pub fn set_pixel(&mut self, x: usize, y: usize, val: u8) -> Option<bool> {
-        let pixel_ref = self.get_pixel_mut(x, y)?; // Propagate underlying pixel failures
-        *pixel_ref = val;
-        
-        Some(true)
-    }
-
-    pub fn set_line(&mut self, byte: u8, idx: usize, val: u8) -> Option<bool> {
-        let line = self.get_line_mut(idx)?;
-        let bits = bits_from_u8(byte);
-        for (r, have_to_print) in bits.iter().enumerate() {
-            if *have_to_print {
-                //self.set_pixel(x+r, idx, val)?;
-            }
+    pub fn set_pixel(&mut self, x: usize, y: usize) -> bool {
+        let collision = false;
+        if let Some(pixel_ref) = self.get_pixel_mut(x, y) { // We ignore the pixel setting if the pixel is not in bounds
+            let collision = *pixel_ref>0;
+            *pixel_ref = if collision {0} else {255};
         }
-        Some(true)
+        collision
     }
 
-    pub fn draw_sprite(&mut self, sprite: Sprite, x: usize, y: usize) {
-        todo!();
+    pub fn put_sprite(&mut self, sprite: Sprite, x: usize, y: usize) -> bool { // true, cpu knows it has to change VF
+        let mut collision = false;
+        for (i, line) in sprite.to_bytes_iter().enumerate() {
+            let bits = bits_from_u8(*line);
+            for (j, bit) in bits.iter().enumerate() {
+                if *bit{
+                    collision = self.set_pixel(x+j, y+i);
+                }
+            }
+        }   
+        collision
     }
 }
 
+
+pub fn bits_from_u8(byte: u8) -> Vec<bool> {
+    let mut bits = Vec::new();
+    for i in 0..8 {
+        bits.push(bool::from_u8((byte>>i)&1));
+    }
+    bits.reverse();
+    bits
+}
+
+trait FromInteger {
+    fn from_u8(val: u8) -> bool;
+}
+
+impl FromInteger for bool {
+    fn from_u8(val: u8) -> bool {
+        if val > 0 {true} else {false}
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
-    use super::{Vram};
+    use crate::chip8::display::{VRAM_WIDTH, VRAM_HEIGHT};
+
+    use super::{Vram, Sprite};
+    use super::bits_from_u8;
+
+    #[test]
+    fn from_u8() {
+        let val = 253;
+        let bits = bits_from_u8(val);
+        assert_eq!(bits, Vec::from([true, true, true, true, true, true, false, true]));
+    }
 
     #[test]
     fn get_pixel_test_valid() {
@@ -136,8 +166,8 @@ mod tests {
 
     #[test]
     fn set_pixel_test_valid() {
-        let mut vram = Vram::default();
-        vram.set_pixel(63, 8, 255).unwrap();
+        let mut vram: Vram = Vram::default();
+        vram.set_pixel(63, 8);
         assert_eq!(*vram.get_pixel(63, 8).unwrap(), 255);
     }
 
@@ -145,7 +175,36 @@ mod tests {
     #[should_panic]
     fn set_pixel_test_invalid() {
         let mut vram = Vram::default();
-        vram.set_pixel(63, 33, 255).unwrap();
+        vram.set_pixel(63, 33);
         assert_eq!(*vram.get_pixel(63, 8).unwrap(), 255);
+    }
+
+    #[test]
+    fn draw_sprite_test() {
+        let sprite = Sprite::try_from(vec![1, 1, 1, 1]).unwrap();
+        let mut vram = Vram::default();
+        vram.put_sprite(sprite, 3, 3);
+        //println!("{}", vram);
+    }
+
+    #[test]
+    fn draw_sprite_xor_test() {
+        let sprite = Sprite::try_from(vec![255, 255, 255, 255]).unwrap();
+        let mut vram = Vram::default();
+        vram.put_sprite(sprite, 3, 3);  
+        let sprite = Sprite::try_from(vec![255, 255, 255, 255]).unwrap();
+        vram.put_sprite(sprite,2, 3);
+        //assert_eq!(vram.arr, [[0; VRAM_WIDTH]; VRAM_HEIGHT]); // Is wor functionning as it should?
+        //println!("{:?}", vram);
+        vram.clear();
+        assert_eq!(vram.arr, [[0; VRAM_WIDTH]; VRAM_HEIGHT]);
+    }
+
+    #[test]
+    fn draw_sprite_oob_test() {
+        let sprite = Sprite::try_from(vec![255, 255, 255, 255]).unwrap();
+        let mut vram = Vram::default();
+        vram.put_sprite(sprite, 58, 3);
+        println!("{:?}", vram.arr);
     }
 }

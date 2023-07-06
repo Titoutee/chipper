@@ -14,7 +14,6 @@ pub struct CPU {
     mem: Mem,
     // Vram
     vram: Vram,
-    //keypad: Keypad,
 }
 
 impl CPU {
@@ -167,9 +166,8 @@ impl CPU {
             }
             0xD => {
                 let coords = (self.registers.v[x], self.registers.v[y]);
-                let sprite_bytes = self.mem.read_segment(n as usize, self.registers.i as usize).expect("Segemnt is not contained in ram (entirely)");
+                let sprite_bytes = self.mem.read_segment(n as usize, self.registers.i as usize).expect("Segemnt is not contained in RAM (entirely)");
                 let sprite = Sprite::try_from(sprite_bytes).expect("Sprite data size is invalid");
-
                 
             }
             _ => (),
