@@ -74,6 +74,7 @@ impl Mem {
     /// Load a (new) custom rom into the mem context (for "rom switching") 
     pub fn load_rom(&mut self, rom: Vec<u8>) {
         self.rom = rom;
+        self.reset();
     }
 
     /// (Re-)sets mem: initializes rom and fonts into ram

@@ -1,7 +1,7 @@
 use core::panic;
 
-use super::display::{Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH, Sprite};
-use super::memory::{self, Mem, Registers, Stack};
+use super::display::{Sprite, Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH};
+use super::memory::{self, Mem, Registers, Stack, RAM_SIZE};
 use rand::{self, Rng};
 
 #[derive(Debug)]
@@ -14,6 +14,13 @@ pub struct CPU {
     mem: Mem,
     // Vram
     vram: Vram,
+    vram_changed: bool,
+}
+
+pub enum CpuState {
+    Normal,
+    Error(String),
+    Finished,
 }
 
 impl CPU {
@@ -23,6 +30,7 @@ impl CPU {
             stack: Stack::default(),
             vram: Vram::default(),
             mem,
+            vram_changed: false,
         };
         cpu.reset(); // Just for mem and pc reinit.
         cpu
@@ -33,27 +41,34 @@ impl CPU {
         self.stack = Stack::default();
         self.vram = Vram::default();
         self.mem.reset();
+        self.vram_changed = false;
         self.registers = Registers {
             pc: memory::ROM_BASE_ADDR as u16,
             ..Default::default() // other are default
         } // Ram gets reinitialized (rom, fonts), as pc
     }
 
-    // Provide no load_rom method, as this will be redundant (parent chip8 will though, for practical use)
-
-    pub fn fetch(&self) -> Option<u16> {
-        let pc = self.registers.pc as usize;
-        self.mem.read_word(pc)
+    pub fn load_rom(&mut self, rom: Vec<u8>) {
+        self.mem.load_rom(rom);
+    }
+    pub fn tick(&mut self) -> CpuState {
+        if self.registers.pc as usize >= RAM_SIZE {
+            return CpuState::Finished;
+        }
+        let instruction = self.fetch(self.registers.pc).expect("Out of bounds word reading");
+        println!("{:04X?}", instruction);
+        self.execute(instruction)
+    }
+    
+    pub fn fetch(&self, pc: u16) -> Option<u16> {
+        self.mem.read_word(pc as usize)
     }
 
     fn bad_opcode(&self, opcode: u16) {
         panic!("Received an invalid opcode in source code: {:X?}", opcode);
     }
 
-    pub fn execute(&mut self) {
-        // Main exec routine
-        let instruction = self.fetch().expect("Out of bounds word reading"); // We get the
-
+    pub fn execute(&mut self, instruction: u16) -> CpuState {
         //Nibbling
         let nnn = instruction & 0x0FFF;
         let kk = (instruction & 0x00FF) as u8;
@@ -67,12 +82,13 @@ impl CPU {
         }
 
         let first_bit = ((instruction & 0xF000) >> 12) as u8;
-        //println!("{}", first_bit);
-        //(nnn, kk, n, x, y)
 
         match first_bit {
             0x0 => match kk {
-                0xE0 => self.vram.clear(), // CLEAR screen
+                0xE0 => {
+                    self.vram.clear(); // CLEAR screen
+                    self.registers.pc+=2;
+                }
 
                 0xEE => {
                     // RET
@@ -82,7 +98,7 @@ impl CPU {
                         .expect("Stack was empty already, ill-formed function nesting")
                 }
 
-                any => self.bad_opcode(any as u16),
+                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
             },
 
             0x1 => self.registers.pc = nnn, // JP addr
@@ -97,23 +113,35 @@ impl CPU {
             0x3 => {
                 // SKIP if Vx == kk
                 if self.registers.v[x] == kk {
-                    self.registers.pc += 2;
+                    self.registers.pc += 4;
+                } else {
+                    self.registers.pc+=2;
                 }
             }
             0x4 => {
                 // SKIP if Vx != kk
                 if self.registers.v[x] != kk {
-                    self.registers.pc += 2;
+                    self.registers.pc += 4;
+                } else {
+                    self.registers.pc+=2;
                 }
             }
             0x5 => {
                 // SKIP if Vx == Vy
                 if self.registers.v[x] == self.registers.v[y] {
-                    self.registers.pc += 2;
+                    self.registers.pc += 4;
+                } else {
+                    self.registers.pc+=2;
                 }
             }
-            0x6 => self.registers.v[x] = kk,
-            0x7 => self.registers.v[x] = (self.registers.v[x] as u16 + kk as u16) as u8, // Removes overflow
+            0x6 => {
+                self.registers.v[x] = kk;
+                self.registers.pc+=2;
+            }
+            0x7 => {
+                self.registers.v[x] = (self.registers.v[x] as u16 + kk as u16) as u8; // Removes overflow
+                self.registers.pc+=2;
+            }
             0x8 => {
                 // Op 8 instructions
                 match n {
@@ -148,30 +176,43 @@ impl CPU {
                         self.registers.v[x] = (self.registers.v[x] as u16 * 2_u16) as u8;
                         // Removes overflow
                     }
-                    any => self.bad_opcode(any as u16),
+                    _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
                 }
+                self.registers.pc+=2;
             }
             0x9 => {
                 // SKIP if Vx != Vy
                 if self.registers.v[x] != self.registers.v[y] {
-                    self.registers.pc += 2;
+                    self.registers.pc += 4;
+                } else {
+                    self.registers.pc+=2;
                 }
             }
-            0xA => self.registers.i = nnn, // Set i = nnn
+            0xA => {
+                self.registers.i = nnn; // Set i = nnn
+                self.registers.pc+=2;
+            }
             0xB => self.registers.pc = nnn + (self.registers.v[0] as u16), // Set pc = V0 + nnn
             0xC => {
                 // Vx = rand AND kk
                 let random: u8 = rand::thread_rng().gen(); // 0-255
                 self.registers.v[x] = random & kk;
+                self.registers.pc+=2;
             }
             0xD => {
-                let coords = (self.registers.v[x], self.registers.v[y]);
-                let sprite_bytes = self.mem.read_segment(n as usize, self.registers.i as usize).expect("Segemnt is not contained in RAM (entirely)");
+                let (x, y) = (self.registers.v[x], self.registers.v[y]);
+                let sprite_bytes = self
+                    .mem
+                    .read_segment(n as usize, self.registers.i as usize)
+                    .expect("Segment is not contained in RAM (entirely)");
                 let sprite = Sprite::try_from(sprite_bytes).expect("Sprite data size is invalid");
-                
+                self.registers.v[0xF] = self.vram.put_sprite(sprite, x.into(), y.into()) as u8;
+                self.vram_changed = true;
+                self.registers.pc+=2;
             }
-            _ => (),
+            _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
         }
+        CpuState::Normal
     }
 }
 
@@ -212,10 +253,10 @@ mod test {
     #[test]
     fn cpu_fetch() {
         let mut cpu = cpu_setup();
-        let instr = cpu.fetch().unwrap();
+        let instr = cpu.fetch(cpu.registers.pc).unwrap();
         assert_eq!(instr, 258);
         cpu.registers.pc += 1;
-        let instr = cpu.fetch().unwrap();
+        let instr = cpu.fetch(cpu.registers.pc).unwrap();
         assert_eq!(instr, 515);
     }
 

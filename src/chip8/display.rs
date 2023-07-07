@@ -193,8 +193,8 @@ mod tests {
         let mut vram = Vram::default();
         vram.put_sprite(sprite, 3, 3);  
         let sprite = Sprite::try_from(vec![255, 255, 255, 255]).unwrap();
-        vram.put_sprite(sprite,2, 3);
-        //assert_eq!(vram.arr, [[0; VRAM_WIDTH]; VRAM_HEIGHT]); // Is wor functionning as it should?
+        vram.put_sprite(sprite,3, 3);
+        assert_eq!(vram.arr, [[0; VRAM_WIDTH]; VRAM_HEIGHT]); // Is wor functionning as it should?
         //println!("{:?}", vram);
         vram.clear();
         assert_eq!(vram.arr, [[0; VRAM_WIDTH]; VRAM_HEIGHT]);
