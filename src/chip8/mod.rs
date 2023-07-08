@@ -4,14 +4,14 @@ pub mod font;
 pub mod input;
 pub mod memory;
 
+use minifb::Key;
 use cpu::{CPU, CpuState};
 use input::{get_key_opcode, KeyBoard};
 use self::memory::Mem;
-use minifb::Key;
 
 pub struct Interpreter {
-    cpu: CPU,
-    keyboard: KeyBoard,
+    pub cpu: CPU,
+    pub keyboard: KeyBoard,
 }
 
 impl Interpreter {
@@ -27,11 +27,11 @@ impl Interpreter {
         self.cpu.load_rom(rom);
     }
 
-    pub fn feed_key(&mut self, key: Key) {
+    pub fn feed_key(&mut self, key: Option<u8>) {
         self.keyboard.feed_key(key);
     }
 
     pub fn tick(&mut self) -> CpuState {
-        self.cpu.tick()
+        self.cpu.tick(&self.keyboard)
     }
 }

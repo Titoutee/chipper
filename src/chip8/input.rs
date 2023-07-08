@@ -13,8 +13,18 @@ impl KeyBoard {
         self.key
     }
 
-    pub fn feed_key(&mut self, key: Key) {
-        self.key = get_key_opcode(Some(key));
+    pub fn feed_key(&mut self, key: Option<u8>) {
+        self.key = key;
+    }
+
+    pub fn is_key_pressed(&self, key: u8) -> bool {
+        if self.key.is_none() {return false;}
+        self.key.unwrap() == key
+    }
+
+    pub fn is_key_up(&self, key: u8) -> bool {
+        if self.key.is_none() {return true;}
+        self.key.unwrap() != key
     }
 }
 

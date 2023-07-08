@@ -7,7 +7,7 @@ use super::font::FONT_SET;
 const STACK_SIZE: usize = 16;
 pub const RAM_SIZE: usize = 0x1000; // 4096
 
-const FONTS_BASE_ADDR: usize = 0x000; // Base adress for fonts in RAM
+pub const FONTS_BASE_ADDR: usize = 0x000; // Base adress for fonts in RAM
 //const FONTS_LIM_ADDR: usize = 0x0F;
 pub const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
 

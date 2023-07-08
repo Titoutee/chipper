@@ -1,7 +1,9 @@
 use core::panic;
 
 use super::display::{Sprite, Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH};
-use super::memory::{self, Mem, Registers, Stack, RAM_SIZE};
+use super::input::KeyBoard;
+use super::memory::{self, Mem, Registers, Stack, RAM_SIZE, FONTS_BASE_ADDR};
+use super::font::FONT_UNIT_SIZE;
 use rand::{self, Rng};
 
 #[derive(Debug)]
@@ -51,24 +53,25 @@ impl CPU {
     pub fn load_rom(&mut self, rom: Vec<u8>) {
         self.mem.load_rom(rom);
     }
-    pub fn tick(&mut self) -> CpuState {
+    pub fn tick(&mut self, kb: &KeyBoard) -> CpuState {
         if self.registers.pc as usize >= RAM_SIZE {
             return CpuState::Finished;
         }
-        let instruction = self.fetch(self.registers.pc).expect("Out of bounds word reading");
+        let instruction = self
+            .fetch(self.registers.pc)
+            .expect("Out of bounds word reading");
         println!("{:04X?}", instruction);
-        self.execute(instruction)
+        self.execute(instruction, kb)
     }
-    
+
     pub fn fetch(&self, pc: u16) -> Option<u16> {
         self.mem.read_word(pc as usize)
     }
 
-    fn bad_opcode(&self, opcode: u16) {
-        panic!("Received an invalid opcode in source code: {:X?}", opcode);
+    pub fn vram(&self) -> &Vram {
+        &self.vram
     }
-
-    pub fn execute(&mut self, instruction: u16) -> CpuState {
+    pub fn execute(&mut self, instruction: u16, kb: &KeyBoard) -> CpuState {
         //Nibbling
         let nnn = instruction & 0x0FFF;
         let kk = (instruction & 0x00FF) as u8;
@@ -87,7 +90,7 @@ impl CPU {
             0x0 => match kk {
                 0xE0 => {
                     self.vram.clear(); // CLEAR screen
-                    self.registers.pc+=2;
+                    self.registers.pc += 2;
                 }
 
                 0xEE => {
@@ -98,7 +101,12 @@ impl CPU {
                         .expect("Stack was empty already, ill-formed function nesting")
                 }
 
-                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+                _ => {
+                    return CpuState::Error(format!(
+                        "Received an invalid opcode in source code: {:X?}",
+                        instruction
+                    ))
+                }
             },
 
             0x1 => self.registers.pc = nnn, // JP addr
@@ -115,7 +123,7 @@ impl CPU {
                 if self.registers.v[x] == kk {
                     self.registers.pc += 4;
                 } else {
-                    self.registers.pc+=2;
+                    self.registers.pc += 2;
                 }
             }
             0x4 => {
@@ -123,7 +131,7 @@ impl CPU {
                 if self.registers.v[x] != kk {
                     self.registers.pc += 4;
                 } else {
-                    self.registers.pc+=2;
+                    self.registers.pc += 2;
                 }
             }
             0x5 => {
@@ -131,16 +139,16 @@ impl CPU {
                 if self.registers.v[x] == self.registers.v[y] {
                     self.registers.pc += 4;
                 } else {
-                    self.registers.pc+=2;
+                    self.registers.pc += 2;
                 }
             }
             0x6 => {
                 self.registers.v[x] = kk;
-                self.registers.pc+=2;
+                self.registers.pc += 2;
             }
             0x7 => {
                 self.registers.v[x] = (self.registers.v[x] as u16 + kk as u16) as u8; // Removes overflow
-                self.registers.pc+=2;
+                self.registers.pc += 2;
             }
             0x8 => {
                 // Op 8 instructions
@@ -176,28 +184,33 @@ impl CPU {
                         self.registers.v[x] = (self.registers.v[x] as u16 * 2_u16) as u8;
                         // Removes overflow
                     }
-                    _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+                    _ => {
+                        return CpuState::Error(format!(
+                            "Received an invalid opcode in source code: {:X?}",
+                            instruction
+                        ))
+                    }
                 }
-                self.registers.pc+=2;
+                self.registers.pc += 2;
             }
             0x9 => {
                 // SKIP if Vx != Vy
                 if self.registers.v[x] != self.registers.v[y] {
                     self.registers.pc += 4;
                 } else {
-                    self.registers.pc+=2;
+                    self.registers.pc += 2;
                 }
             }
             0xA => {
                 self.registers.i = nnn; // Set i = nnn
-                self.registers.pc+=2;
+                self.registers.pc += 2;
             }
             0xB => self.registers.pc = nnn + (self.registers.v[0] as u16), // Set pc = V0 + nnn
             0xC => {
                 // Vx = rand AND kk
                 let random: u8 = rand::thread_rng().gen(); // 0-255
                 self.registers.v[x] = random & kk;
-                self.registers.pc+=2;
+                self.registers.pc += 2;
             }
             0xD => {
                 let (x, y) = (self.registers.v[x], self.registers.v[y]);
@@ -208,7 +221,79 @@ impl CPU {
                 let sprite = Sprite::try_from(sprite_bytes).expect("Sprite data size is invalid");
                 self.registers.v[0xF] = self.vram.put_sprite(sprite, x.into(), y.into()) as u8;
                 self.vram_changed = true;
-                self.registers.pc+=2;
+                self.registers.pc += 2;
+            }
+            0xE => match kk {
+                0x9E => {
+                    let key = self.registers.v[x];
+                    if kb.is_key_pressed(key) {
+                        self.registers.pc += 4;
+                    } else {
+                        self.registers.pc += 2;
+                    }
+                }
+                0xA1 => {
+                    let key = self.registers.v[x];
+                    if kb.is_key_up(key) {
+                        self.registers.pc += 4;
+                    } else {
+                        self.registers.pc += 2;
+                    }
+                }
+                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+            }
+            0xF => match kk {
+                0x07 => {
+                    self.registers.v[x] = self.registers.dt;
+                    self.registers.pc += 2
+                }
+                0x0A => todo!(),
+                0x15 => {
+                    self.registers.dt = self.registers.v[x];
+                    self.registers.pc += 2
+                }
+                0x18 => {
+                    self.registers.st = self.registers.v[x];
+                    self.registers.pc += 2
+                }
+                0x1E => {
+                    self.registers.i = self.registers.i as u16 + self.registers.v[x] as u16;
+                    self.registers.pc += 2;
+                }
+                0x29 => {
+                    self.registers.i = FONTS_BASE_ADDR as u16 + (self.registers.v[x] as u16 * FONT_UNIT_SIZE as u16);
+                    self.registers.pc += 2
+                }
+                0x33 => {
+                    let mut copy = self.registers.v[x];
+
+                    let hundreds = copy/100;
+                    copy-=hundreds*100;
+
+                    let tens = copy/10;
+                    copy-=tens*10; // remains ones digits in copy
+
+                    self.mem.write_byte((self.registers.i) as usize, hundreds);
+                    self.mem.write_byte((self.registers.i+1) as usize, tens);
+                    self.mem.write_byte((self.registers.i+2) as usize, copy);
+
+                    self.registers.pc += 2
+                }
+                0x55 => {
+                    for x in 0..=0xF {
+                        self.mem.write_byte((self.registers.i + x) as usize, self.registers.v[x as usize]);
+                    }
+
+                    self.registers.pc += 2
+                }
+                0x65 => {
+                    for x in 0..=0xF {
+                        self.registers.v[x] = self.mem.read_byte((self.registers.i+x as u16) as usize).unwrap();
+                    }
+
+                    self.registers.pc += 2
+                }
+                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
             }
             _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
         }
