@@ -1,7 +1,7 @@
 use core::panic;
 
 use super::display::{Sprite, Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH};
-use super::input::KeyBoard;
+use super::input::{KeyBoard, get_key_opcode};
 use super::memory::{self, Mem, Registers, Stack, RAM_SIZE, FONTS_BASE_ADDR};
 use super::font::FONT_UNIT_SIZE;
 use rand::{self, Rng};
@@ -38,6 +38,14 @@ impl CPU {
         cpu
     }
 
+    pub fn vram_changed(&self) -> bool {
+        self.vram_changed
+    }
+
+    pub fn vram(&self) -> &Vram {
+        &self.vram
+    }
+
     pub fn reset(&mut self) {
         self.registers = Registers::default();
         self.stack = Stack::default();
@@ -54,6 +62,7 @@ impl CPU {
         self.mem.load_rom(rom);
     }
     pub fn tick(&mut self, kb: &KeyBoard) -> CpuState {
+        self.vram_changed = false;
         if self.registers.pc as usize >= RAM_SIZE {
             return CpuState::Finished;
         }
@@ -61,6 +70,8 @@ impl CPU {
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
         println!("{:04X?}", instruction);
+        self.decrease_delaytimer();
+        self.decrease_soundtimer();
         self.execute(instruction, kb)
     }
 
@@ -68,9 +79,19 @@ impl CPU {
         self.mem.read_word(pc as usize)
     }
 
-    pub fn vram(&self) -> &Vram {
-        &self.vram
+    
+    pub fn decrease_soundtimer(&mut self) {
+        if (self.registers.st) != 0 {
+            self.registers.st -= 1;
+        }
     }
+
+    pub fn decrease_delaytimer(&mut self) {
+        if (self.registers.dt) != 0 {
+            self.registers.dt -= 1;
+        }
+    }
+
     pub fn execute(&mut self, instruction: u16, kb: &KeyBoard) -> CpuState {
         //Nibbling
         let nnn = instruction & 0x0FFF;
@@ -247,7 +268,12 @@ impl CPU {
                     self.registers.v[x] = self.registers.dt;
                     self.registers.pc += 2
                 }
-                0x0A => todo!(),
+                0x0A => {
+                    if let Some(key) = kb.get_key_pressed() {
+                        self.registers.v[x] = key;
+                        self.registers.pc+=2;
+                    }
+                }
                 0x15 => {
                     self.registers.dt = self.registers.v[x];
                     self.registers.pc += 2

@@ -73,18 +73,19 @@ impl Vram {
     pub fn to_screen_buffer(&self) -> Vec<u32> {
         let mut buffer = vec![0; SCREEN_HEIGHT * SCREEN_WIDTH];
         for y in 0..SCREEN_HEIGHT {
-            let y_coord = y / 10;
+            let y_vram_coord = y / 10;
             for x in 0..SCREEN_WIDTH {
-                let x_coord = x / 10;
-                let pixel = self.get_pixel(x_coord, y_coord).unwrap();
+                let x_vram_coord = x / 10;
+                let pixel = self.get_pixel(x_vram_coord, y_vram_coord).unwrap();
                 let color = match *pixel {
                     0 => 0x0,
                     1 => 0xffffff,
                     _ => panic!("Unknown colour"),
                 };
-                buffer[y * VRAM_WIDTH + x] = color;
+                buffer[y * SCREEN_WIDTH + x] = color;
             }
         }
+        println!("updated display");
         buffer
     }
 
@@ -263,10 +264,10 @@ mod tests {
         let mut window = Window::new("CHIP-8 Emulator", SCREEN_WIDTH, SCREEN_HEIGHT, WindowOptions::default())
             .unwrap_or_else(|_| panic!("Couldn't create window"));
         window.set_title("CHIP-8 Emulator");
-        let sprite = Sprite::try_from(vec![255, 255, 255, 255]).unwrap();
+        let sprite = Sprite::try_from(vec![192, 65, 64, 64, 64,64,64,64,64,64,64,64,64,64,64,64]).unwrap();
         let mut vram = Vram::default();
-        vram.put_sprite(sprite, 3, 3);
-        while window.is_open() {
+        vram.put_sprite(sprite, 0, 0);
+        while window.is_open() && !window.is_key_down(minifb::Key::Escape){
             window.update_with_buffer(&vram.to_screen_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT).unwrap();
         }
     }

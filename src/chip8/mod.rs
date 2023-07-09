@@ -34,4 +34,8 @@ impl Interpreter {
     pub fn tick(&mut self) -> CpuState {
         self.cpu.tick(&self.keyboard)
     }
+
+    pub fn vram_changed(&self) -> bool {
+        self.cpu.vram_changed()
+    }
 }

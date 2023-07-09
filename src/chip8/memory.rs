@@ -14,7 +14,7 @@ pub const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
 #[derive(Debug, Default)]
 /// A set of registers, likely to be owned by a CPU
 pub struct Registers {
-    // Generl purpose regs, which can be written to and read from (VF is not accessible from programs though)
+    // General purpose regs, which can be written to and read from (VF is not accessible from programs though)
     pub v: [u8; 16],
     // A special adress holding reg (as RAM is 4KB, only the 12 lower bits are used (max value = 4095))
     pub i: u16,

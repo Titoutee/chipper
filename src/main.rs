@@ -62,7 +62,7 @@ fn main() {
         }
         
         //display clock
-        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) {
+        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) && chip8.vram_changed() {
             window.update_with_buffer(&chip8.cpu.vram().to_screen_buffer(), width, height).unwrap();
             last_display_instant = Instant::now();
         }
