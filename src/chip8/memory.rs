@@ -1,14 +1,10 @@
 //! Module exposing mechanisms linked to memory
-use std::default;
-use std::fmt::Display;
-use super::display::{Sprite};
 use super::font::FONT_SET;
 
 const STACK_SIZE: usize = 16;
 pub const RAM_SIZE: usize = 0x1000; // 4096
 
 pub const FONTS_BASE_ADDR: usize = 0x000; // Base adress for fonts in RAM
-//const FONTS_LIM_ADDR: usize = 0x0F;
 pub const ROM_BASE_ADDR: usize = 0x200; // Base adress for ROM in RAM
 
 #[derive(Debug, Default)]
@@ -35,6 +31,7 @@ impl Stack {
         if self.vec.len()+1 > STACK_SIZE {
             return None;
         }
+
         self.vec.push(val);
         Some(())
     }
@@ -56,8 +53,8 @@ impl Default for Stack {
 #[derive(Debug)]
 /// Main memory unit
 pub struct Mem {
-    ram: [u8; RAM_SIZE], // Main RAM
-    pub rom: Vec<u8>,        // Embedded instructions, wich will be included in RAM
+    ram: [u8; RAM_SIZE], // Main RAM 
+    rom: Vec<u8>,        // Embedded instructions, wich will be included in RAM
 }
 
 impl Mem {
@@ -69,6 +66,10 @@ impl Mem {
         };
         mem.reset(); // Puts the loaded (embedded) rom into ram
         mem
+    }
+
+    pub fn rom(&self) -> &[u8] {
+        self.rom.as_slice()
     }
 
     /// Load a (new) custom rom into the mem context (for "rom switching") 
@@ -159,6 +160,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[allow(unused)]
     fn stack_pop_invalid() {
         let mut stack = Stack::default();
         let popped = stack.pop().unwrap();

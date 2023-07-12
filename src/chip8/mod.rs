@@ -4,9 +4,9 @@ pub mod font;
 pub mod input;
 pub mod memory;
 
-use minifb::Key;
+//use minifb::Key;
 use cpu::{CPU, CpuState};
-use input::{get_key_opcode, KeyBoard};
+use input::{KeyBoard};
 use self::memory::Mem;
 
 pub struct Interpreter {

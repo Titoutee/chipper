@@ -18,13 +18,17 @@ impl KeyBoard {
     }
 
     pub fn is_key_pressed(&self, key: u8) -> bool {
-        if self.key.is_none() {return false;}
-        self.key.unwrap() == key
+        match self.key {
+            None => false,
+            Some(inner) => key == inner,
+        }
     }
 
     pub fn is_key_up(&self, key: u8) -> bool {
-        if self.key.is_none() {return true;}
-        self.key.unwrap() != key
+        match self.key {
+            None => true, // nothing is pressed atm
+            Some(inner) => key != inner,
+        }
     }
 }
 
@@ -53,4 +57,22 @@ pub fn get_key_opcode(key: Option<Key>) -> Option<u8> {
         _ => None,
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{KeyBoard, Key};
+    
+    #[test]
+    fn keyboard_tests() {
+        let mut kb = KeyBoard::new();
+        kb.feed_key(Some(3));
+        assert_eq!(kb.get_key_pressed(), Some(3));
+        kb.feed_key(None);
+        assert_ne!(kb.get_key_pressed(), Some(3));
+        kb.feed_key(Some(3));
+        assert!(kb.is_key_pressed(3));
+        assert!(!kb.is_key_up(3));
+        assert!(kb.is_key_up(4));
+    }
 }

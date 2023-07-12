@@ -5,9 +5,9 @@ use std::time::{Duration, Instant};
 use std::{env, fs::File, io::Read};
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let filename = match args.get(1) {
-        Some(filename) => filename.clone(),
-        None => panic!("chipper [filename]"),
+    let filename: &str = match args.get(1) {
+        Some(filename) => filename,
+        None => "../chip8-roms/games/TETRIS",
     };
 
     let mut file = File::open(filename).unwrap();
@@ -17,13 +17,10 @@ fn main() {
         panic!("An error occured: {}", err);
     }
 
-    let height = 320;
-    let width = 640;
-
     let mut chip8 = Interpreter::new();
-    chip8.load_rom(rom);
+    chip8.load_rom(rom); // Each byte is loaded as is, the cpu then assembles words
 
-    let mut window = Window::new("CHIP-8 Emulator", width, height, WindowOptions::default())
+    let mut window = Window::new("CHIP-8 Emulator", SCREEN_WIDTH, SCREEN_HEIGHT, WindowOptions::default())
         .unwrap_or_else(|_| panic!("Couldn't create window"));
     window.set_title("CHIP-8 Emulator");
 
@@ -34,37 +31,37 @@ fn main() {
     let mut last_display_instant = Instant::now();
     let display_epsilon = 2;
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        let keys_pressed = window.get_keys_pressed(KeyRepeat::Yes);
+    while window.is_open() && !window.is_key_down(Key::Escape) { // Escape to exit
+        let keys_pressed = window.get_keys_pressed(KeyRepeat::Yes); // get all the presently pressed keys
         let key = if !keys_pressed.is_empty() {
-            Some(keys_pressed[0])
+            Some(keys_pressed[0]) // Interest only for the first one
         } else {
             None
         };
 
         //key getting clock
         if key.is_some() && Instant::now() - last_keyboard_instant >= Duration::from_millis(kb_epsilon) {
-            if get_key_opcode(key).is_some() {
-                println!("Got some valid key");
-            }
+            //if get_key_opcode(key).is_some() {
+            //    println!("Got some valid key");
+            //}
             chip8.feed_key(get_key_opcode(key)); // We feed into KeyBoard the just (valid) got key
-            last_keyboard_instant = Instant::now();
+            last_keyboard_instant = Instant::now(); // Instant refresh
         }
 
         //instruction executing clock
         if Instant::now() - last_instruction_instant > Duration::from_millis(instruction_epsilon) {
-            match chip8.tick() {
+            match chip8.tick() { // get cpu state
                 CpuState::Error(err) => panic!("{}", err),
                 CpuState::Finished => break,
                 _ => (),
             }
-            last_instruction_instant = Instant::now();
+            last_instruction_instant = Instant::now(); // Instant refresh
         }
         
         //display clock
-        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) && chip8.vram_changed() {
-            window.update_with_buffer(&chip8.cpu.vram().to_screen_buffer(), width, height).unwrap();
-            last_display_instant = Instant::now();
+        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) {
+            window.update_with_buffer(&chip8.cpu.vram().to_screen_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT).unwrap();
+            last_display_instant = Instant::now(); // Instant refresh
         }
     }
 

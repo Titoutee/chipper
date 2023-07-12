@@ -1,4 +1,6 @@
 //! Display API
+//! 
+pub type VramType = [[u8; VRAM_WIDTH]; VRAM_HEIGHT];
 
 pub const SPRITE_MAX_SIZE: usize = 15;
 pub const VRAM_WIDTH: usize = 64;
@@ -6,8 +8,6 @@ pub const VRAM_HEIGHT: usize = 32;
 
 pub const SCREEN_WIDTH: usize = 640;
 pub const SCREEN_HEIGHT: usize = 320;
-
-pub type VramType = [[u8; VRAM_WIDTH]; VRAM_HEIGHT];
 pub const VRAM_DEFAULT: VramType = [[0; VRAM_WIDTH]; VRAM_HEIGHT];
 
 pub struct Sprite {
@@ -54,16 +54,6 @@ impl Vram {
 
     pub fn inner(&self) -> VramType {
         self.arr
-    }
-
-    fn flatten(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(VRAM_HEIGHT * VRAM_WIDTH);
-        for sub in self.arr {
-            for j in sub {
-                vec.push(j);
-            }
-        }
-        vec
     }
 
     pub fn flattened_idx(&self, x: usize, y: usize) -> usize {
@@ -264,7 +254,7 @@ mod tests {
         let mut window = Window::new("CHIP-8 Emulator", SCREEN_WIDTH, SCREEN_HEIGHT, WindowOptions::default())
             .unwrap_or_else(|_| panic!("Couldn't create window"));
         window.set_title("CHIP-8 Emulator");
-        let sprite = Sprite::try_from(vec![192, 65, 64, 64, 64,64,64,64,64,64,64,64,64,64,64,64]).unwrap();
+        let sprite = Sprite::try_from(vec![192, 65, 64, 64, 64,64,64,64,64,64,64,64,64]).unwrap();
         let mut vram = Vram::default();
         vram.put_sprite(sprite, 0, 0);
         while window.is_open() && !window.is_key_down(minifb::Key::Escape){

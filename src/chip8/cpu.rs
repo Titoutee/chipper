@@ -1,7 +1,7 @@
 use core::panic;
 
-use super::display::{Sprite, Vram, SPRITE_MAX_SIZE, VRAM_DEFAULT, VRAM_HEIGHT, VRAM_WIDTH};
-use super::input::{KeyBoard, get_key_opcode};
+use super::display::{Sprite, Vram};
+use super::input::{KeyBoard};
 use super::memory::{self, Mem, Registers, Stack, RAM_SIZE, FONTS_BASE_ADDR};
 use super::font::FONT_UNIT_SIZE;
 use rand::{self, Rng};
@@ -69,7 +69,7 @@ impl CPU {
         let instruction = self
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
-        println!("{:04X?}", instruction);
+        //println!("{:04X?}", instruction);
         self.decrease_delaytimer();
         self.decrease_soundtimer();
         self.execute(instruction, kb)
@@ -79,7 +79,6 @@ impl CPU {
         self.mem.read_word(pc as usize)
     }
 
-    
     pub fn decrease_soundtimer(&mut self) {
         if (self.registers.st) != 0 {
             self.registers.st -= 1;
@@ -100,6 +99,7 @@ impl CPU {
         let x = ((instruction & 0x0F00) >> 8) as usize;
         let y = ((instruction & 0x00F0) >> 4) as usize;
 
+        //println!("Instruction: {:04X?}, nibbled: nnn: {:X?}, kk: {:X?}, n: {:X?}, x: {:X?}, y: {:X?}", instruction, nnn, kk, n, x, y);
         if x > 0xF || y > 0xF {
             // Vx regs are 16 long
             panic!("Ill-formed given x and y indexes...");
@@ -124,10 +124,11 @@ impl CPU {
 
                 _ => {
                     return CpuState::Error(format!(
-                        "Received an invalid opcode in source code: {:X?}",
+                        "Received an invalid opcode in source code: {:04X?}",
                         instruction
                     ))
                 }
+                // 0nnn is not supported by modern interpreters, and thus is not implemented on pupose here
             },
 
             0x1 => self.registers.pc = nnn, // JP addr
@@ -168,7 +169,7 @@ impl CPU {
                 self.registers.pc += 2;
             }
             0x7 => {
-                self.registers.v[x] = (self.registers.v[x] as u16 + kk as u16) as u8; // Removes overflow
+                self.registers.v[x] = (self.registers.v[x] as u16 + kk as u16) as u8;
                 self.registers.pc += 2;
             }
             0x8 => {
@@ -180,8 +181,8 @@ impl CPU {
                     0x3 => self.registers.v[x] ^= self.registers.v[y], // Vx XOR Vy
                     0x4 => {
                         // Vx += Vy, VF = carry
-                        let addition = self.registers.v[x] as u16 + self.registers.v[y] as u16; // We need another variable for u8 overflow checking
-                        self.registers.v[x] = addition as u8; // Removes overflow
+                        let addition = self.registers.v[x] as u16 + self.registers.v[y] as u16;
+                        self.registers.v[x] = addition as u8;
                         self.registers.v[0xF] = (addition > 0xFF/*255*/) as u8;
                     }
                     0x5 => {
@@ -192,7 +193,7 @@ impl CPU {
                     0x6 => {
                         // VF = Vx LSb, Vx /= 2
                         self.registers.v[0xF] = self.registers.v[x] & 0b1; // LSb
-                        self.registers.v[x] /= 2;
+                        self.registers.v[x] >>= 1;
                     }
                     0x7 => {
                         // Wrapping substraction, VF = BORROW
@@ -201,13 +202,12 @@ impl CPU {
                     }
                     0xE => {
                         // VF = Vx MSb, Vx *= 2
-                        self.registers.v[0xF] = self.registers.v[x] & 0b10000000; // MSb
-                        self.registers.v[x] = (self.registers.v[x] as u16 * 2_u16) as u8;
-                        // Removes overflow
+                        self.registers.v[0xF] = self.registers.v[x] & 0b10000000; // MSb (aka 128)
+                        self.registers.v[x] <<= 2;
                     }
                     _ => {
                         return CpuState::Error(format!(
-                            "Received an invalid opcode in source code: {:X?}",
+                            "Received an invalid opcode in source code: {:04X?}",
                             instruction
                         ))
                     }
@@ -261,7 +261,7 @@ impl CPU {
                         self.registers.pc += 2;
                     }
                 }
-                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
             }
             0xF => match kk {
                 0x07 => {
@@ -319,9 +319,9 @@ impl CPU {
 
                     self.registers.pc += 2
                 }
-                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
             }
-            _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:X?}", instruction)),
+            _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
         }
         CpuState::Normal
     }
@@ -331,9 +331,10 @@ impl CPU {
 mod test {
     use super::memory::ROM_BASE_ADDR;
     use super::CPU;
-    use super::{VRAM_HEIGHT, VRAM_WIDTH};
     use crate::chip8::display::VRAM_DEFAULT;
+    use crate::chip8::input::KeyBoard;
     use crate::chip8::memory::Mem;
+    //use super::CpuState;
 
     fn cpu_setup() -> CPU {
         CPU::new(Mem::new(Vec::from([1, 2, 3, 4]))) // Main setup with all default, but mem's rom (and ram) is filled with 4 bytes
@@ -358,7 +359,7 @@ mod test {
     fn cpu_reset() {
         let mut cpu = cpu_setup();
         cpu.reset();
-        assert_eq!(cpu.mem.rom, Vec::from([1, 2, 3, 4]));
+        assert_eq!(cpu.mem.rom(), &Vec::from([1, 2, 3, 4]));
     }
 
     #[test]
@@ -371,10 +372,9 @@ mod test {
         assert_eq!(instr, 515);
     }
 
-    //#[test]
-    //fn cpu_execute() {
-    //    let mut cpu = cpu_setup(); // rom: [1, 2, 3, 4]
-    //    //word(1, 2) = 258 (u16)
-    //    cpu.execute();
-    //}
+    #[test]
+    fn nibbling() {
+        let mut cpu = cpu_setup();
+        cpu.execute(0xF0E0, &KeyBoard::new());
+    }
 }
