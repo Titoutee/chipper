@@ -34,26 +34,25 @@ impl KeyBoard {
 
 pub fn get_key_opcode(key: Option<Key>) -> Option<u8> {
     match key {
-        Some(Key::Key1) => Some(0x1),
-        Some(Key::Key2) => Some(0x2),
-        Some(Key::Key3) => Some(0x3),
-        Some(Key::Key4) => Some(0x4),
+        Some(Key::Y) => Some(0x1),
+        Some(Key::U) => Some(0x2),
+        Some(Key::I) => Some(0x3),
+        Some(Key::O) => Some(0xC),
 
         Some(Key::A) => Some(0x4),
         Some(Key::Z) => Some(0x5),
         Some(Key::E) => Some(0x6),
-        Some(Key::R) => Some(0x7),
+        Some(Key::R) => Some(0xD),
 
-        Some(Key::Q) => Some(0x8),
-        Some(Key::S) => Some(0x9),
-        Some(Key::D) => Some(0xA),
-        Some(Key::F) => Some(0xB),
+        Some(Key::Q) => Some(0x7),
+        Some(Key::S) => Some(0x8),
+        Some(Key::D) => Some(0x9),
+        Some(Key::F) => Some(0xE),
 
-        Some(Key::W) => Some(0xC),
-        Some(Key::X) => Some(0xD),
-        Some(Key::C) => Some(0xE),
+        Some(Key::W) => Some(0xA),
+        Some(Key::X) => Some(0x0),
+        Some(Key::C) => Some(0xB),
         Some(Key::V) => Some(0xF),
-
         _ => None,
     }
 
@@ -61,7 +60,7 @@ pub fn get_key_opcode(key: Option<Key>) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{KeyBoard, Key};
+    use super::KeyBoard;
     
     #[test]
     fn keyboard_tests() {

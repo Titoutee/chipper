@@ -109,6 +109,7 @@ impl Mem {
         }
     }
 
+    /// Reads a n-bytes segment
     pub fn read_segment(&self, n_bytes: usize, addr: usize) -> Option<Vec<u8>> {
         let mut segment = Vec::<u8>::new();
         for offset in 0..n_bytes {

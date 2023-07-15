@@ -1,9 +1,9 @@
 use core::panic;
 
 use super::display::{Sprite, Vram};
-use super::input::{KeyBoard};
-use super::memory::{self, Mem, Registers, Stack, RAM_SIZE, FONTS_BASE_ADDR};
 use super::font::FONT_UNIT_SIZE;
+use super::input::KeyBoard;
+use super::memory::{self, Mem, Registers, Stack, FONTS_BASE_ADDR, RAM_SIZE};
 use rand::{self, Rng};
 
 #[derive(Debug)]
@@ -70,8 +70,8 @@ impl CPU {
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
         //println!("{:04X?}", instruction);
-        self.decrease_delaytimer();
-        self.decrease_soundtimer();
+        //self.decrease_delaytimer();
+        //self.decrease_soundtimer();
         self.execute(instruction, kb)
     }
 
@@ -127,8 +127,7 @@ impl CPU {
                         "Received an invalid opcode in source code: {:04X?}",
                         instruction
                     ))
-                }
-                // 0nnn is not supported by modern interpreters, and thus is not implemented on pupose here
+                } // 0nnn is not supported by modern interpreters, and thus is not implemented on pupose here
             },
 
             0x1 => self.registers.pc = nnn, // JP addr
@@ -136,7 +135,7 @@ impl CPU {
             0x2 => {
                 // CALL addr
                 self.stack
-                    .push(self.registers.pc) // save current pc
+                    .push(self.registers.pc + 2) // save current pc
                     .expect("Program tried to overflow its stack");
                 self.registers.pc = nnn; // JP
             }
@@ -187,23 +186,27 @@ impl CPU {
                     }
                     0x5 => {
                         // Wrapping substraction, VF = BORROW
-                        self.registers.v[0xF] = (self.registers.v[x] > self.registers.v[y]) as u8;
+                        let of = (self.registers.v[x] > self.registers.v[y]) as u8;
                         self.registers.v[x] = self.registers.v[x].wrapping_sub(self.registers.v[y]);
+                        self.registers.v[0xF] = of;
                     }
                     0x6 => {
                         // VF = Vx LSb, Vx /= 2
-                        self.registers.v[0xF] = self.registers.v[x] & 0b1; // LSb
+                        let lsb = self.registers.v[x] & 0b1; // LSb
                         self.registers.v[x] >>= 1;
+                        self.registers.v[0xF] = lsb
                     }
                     0x7 => {
                         // Wrapping substraction, VF = BORROW
-                        self.registers.v[0xF] = (self.registers.v[y] > self.registers.v[x]) as u8;
+                        let of = (self.registers.v[y] > self.registers.v[x]) as u8;
                         self.registers.v[x] = self.registers.v[y].wrapping_sub(self.registers.v[x]);
+                        self.registers.v[0xF] = of;
                     }
                     0xE => {
                         // VF = Vx MSb, Vx *= 2
-                        self.registers.v[0xF] = self.registers.v[x] & 0b10000000; // MSb (aka 128)
-                        self.registers.v[x] <<= 2;
+                        let msb = (self.registers.v[x] & 0b10000000)>>7; // MSb (aka 128)
+                        self.registers.v[x] <<= 1;
+                        self.registers.v[0xF] = msb;
                     }
                     _ => {
                         return CpuState::Error(format!(
@@ -261,8 +264,13 @@ impl CPU {
                         self.registers.pc += 2;
                     }
                 }
-                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
-            }
+                _ => {
+                    return CpuState::Error(format!(
+                        "Received an invalid opcode in source code: {:04X?}",
+                        instruction
+                    ))
+                }
+            },
             0xF => match kk {
                 0x07 => {
                     self.registers.v[x] = self.registers.dt;
@@ -271,7 +279,7 @@ impl CPU {
                 0x0A => {
                     if let Some(key) = kb.get_key_pressed() {
                         self.registers.v[x] = key;
-                        self.registers.pc+=2;
+                        self.registers.pc += 2;
                     }
                 }
                 0x15 => {
@@ -287,41 +295,54 @@ impl CPU {
                     self.registers.pc += 2;
                 }
                 0x29 => {
-                    self.registers.i = FONTS_BASE_ADDR as u16 + (self.registers.v[x] as u16 * FONT_UNIT_SIZE as u16);
+                    self.registers.i = FONTS_BASE_ADDR as u16
+                        + (self.registers.v[x] as u16 * FONT_UNIT_SIZE as u16);
                     self.registers.pc += 2
                 }
                 0x33 => {
-                    let mut copy = self.registers.v[x];
+                    let copy = self.registers.v[x];
 
-                    let hundreds = copy/100;
-                    copy-=hundreds*100;
-
-                    let tens = copy/10;
-                    copy-=tens*10; // remains ones digits in copy
-
-                    self.mem.write_byte((self.registers.i) as usize, hundreds);
-                    self.mem.write_byte((self.registers.i+1) as usize, tens);
-                    self.mem.write_byte((self.registers.i+2) as usize, copy);
+                    self.mem.write_byte((self.registers.i) as usize, copy / 100);
+                    self.mem
+                        .write_byte((self.registers.i + 1) as usize, (copy % 100) / 10);
+                    self.mem
+                        .write_byte((self.registers.i + 2) as usize, copy % 10);
 
                     self.registers.pc += 2
                 }
                 0x55 => {
-                    for x in 0..=0xF {
-                        self.mem.write_byte((self.registers.i + x) as usize, self.registers.v[x as usize]);
+                    for off in 0..=x {
+                        self.mem.write_byte(
+                            (self.registers.i + off as u16) as usize,
+                            self.registers.v[off as usize],
+                        );
                     }
-
+                    self.registers.i += x as u16 + 1;
                     self.registers.pc += 2
                 }
                 0x65 => {
-                    for x in 0..=0xF {
-                        self.registers.v[x] = self.mem.read_byte((self.registers.i+x as u16) as usize).unwrap();
+                    for off in 0..=x {
+                        self.registers.v[off] = self
+                            .mem
+                            .read_byte((self.registers.i + off as u16) as usize)
+                            .unwrap();
                     }
-
+                    self.registers.i += x as u16 + 1;
                     self.registers.pc += 2
                 }
-                _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
+                _ => {
+                    return CpuState::Error(format!(
+                        "Received an invalid opcode in source code: {:04X?}",
+                        instruction
+                    ))
+                }
+            },
+            _ => {
+                return CpuState::Error(format!(
+                    "Received an invalid opcode in source code: {:04X?}",
+                    instruction
+                ))
             }
-            _ => return CpuState::Error(format!("Received an invalid opcode in source code: {:04X?}", instruction)),
         }
         CpuState::Normal
     }

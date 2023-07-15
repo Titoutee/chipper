@@ -75,7 +75,7 @@ impl Vram {
                 buffer[y * SCREEN_WIDTH + x] = color;
             }
         }
-        println!("updated display");
+        //println!("updated display");
         buffer
     }
 

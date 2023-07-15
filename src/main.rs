@@ -1,13 +1,12 @@
-use chipper::chip8::{cpu::CpuState, Interpreter, input::{get_key_opcode}, display::{SCREEN_HEIGHT, SCREEN_WIDTH}};
+use chipper::chip8::{cpu::CpuState, Interpreter, input::get_key_opcode, display::{SCREEN_HEIGHT, SCREEN_WIDTH}};
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use std::time::{Duration, Instant};
 use std::{env, fs::File, io::Read};
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let filename: &str = match args.get(1) {
+    let filename: String = match env::args().nth(1) {
         Some(filename) => filename,
-        None => "../chip8-roms/games/TETRIS",
+        None => String::from("TETRIS"),
     };
 
     let mut file = File::open(filename).unwrap();
@@ -25,11 +24,11 @@ fn main() {
     window.set_title("CHIP-8 Emulator");
 
     let mut last_keyboard_instant = Instant::now();
-    let kb_epsilon = 100;
+    let kb_epsilon = 5;
     let mut last_instruction_instant = Instant::now();
-    let instruction_epsilon = 2;
+    let instruction_epsilon = 1;
     let mut last_display_instant = Instant::now();
-    let display_epsilon = 2;
+    let display_epsilon = 1;
 
     while window.is_open() && !window.is_key_down(Key::Escape) { // Escape to exit
         let keys_pressed = window.get_keys_pressed(KeyRepeat::Yes); // get all the presently pressed keys
