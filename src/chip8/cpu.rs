@@ -1,4 +1,5 @@
 use core::panic;
+use std::time::{Instant, Duration};
 
 use super::display::{Sprite, Vram};
 use super::font::FONT_UNIT_SIZE;
@@ -6,10 +7,13 @@ use super::input::KeyBoard;
 use super::memory::{self, Mem, Registers, Stack, FONTS_BASE_ADDR, RAM_SIZE};
 use rand::{self, Rng};
 
+const TIMER_EPSILON: u64 = 16; // Appr. 60 Hz if expressed in ms
+
 #[derive(Debug)]
 pub struct CPU {
     // Some useful registers
     registers: Registers,
+    last_timer_change: Instant,
     // A stack
     stack: Stack, // independant from main ram
     // Mem
@@ -28,6 +32,7 @@ pub enum CpuState {
 impl CPU {
     pub fn new(mem: Mem) -> Self {
         let mut cpu = Self {
+            last_timer_change: Instant::now(),
             registers: Registers::default(),
             stack: Stack::default(),
             vram: Vram::default(),
@@ -48,6 +53,7 @@ impl CPU {
 
     pub fn reset(&mut self) {
         self.registers = Registers::default();
+        self.last_timer_change = Instant::now();
         self.stack = Stack::default();
         self.vram = Vram::default();
         self.mem.reset();
@@ -70,8 +76,12 @@ impl CPU {
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
         //println!("{:04X?}", instruction);
-        //self.decrease_delaytimer();
-        //self.decrease_soundtimer();
+        if Instant::now() - self.last_timer_change >= Duration::from_millis(TIMER_EPSILON) {
+            println!("Timer decrease!");
+            self.decrease_delaytimer();
+            self.decrease_soundtimer();
+            self.last_timer_change = Instant::now();
+        }
         self.execute(instruction, kb)
     }
 

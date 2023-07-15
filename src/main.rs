@@ -24,11 +24,11 @@ fn main() {
     window.set_title("CHIP-8 Emulator");
 
     let mut last_keyboard_instant = Instant::now();
-    let kb_epsilon = 5;
+    let kb_epsilon = 200;
     let mut last_instruction_instant = Instant::now();
-    let instruction_epsilon = 1;
+    let instruction_epsilon = 2;
     let mut last_display_instant = Instant::now();
-    let display_epsilon = 1;
+    let display_epsilon = 10;
 
     while window.is_open() && !window.is_key_down(Key::Escape) { // Escape to exit
         let keys_pressed = window.get_keys_pressed(KeyRepeat::Yes); // get all the presently pressed keys
@@ -39,10 +39,7 @@ fn main() {
         };
 
         //key getting clock
-        if key.is_some() && Instant::now() - last_keyboard_instant >= Duration::from_millis(kb_epsilon) {
-            //if get_key_opcode(key).is_some() {
-            //    println!("Got some valid key");
-            //}
+        if key.is_some() || Instant::now() - last_keyboard_instant >= Duration::from_millis(kb_epsilon) {
             chip8.feed_key(get_key_opcode(key)); // We feed into KeyBoard the just (valid) got key
             last_keyboard_instant = Instant::now(); // Instant refresh
         }
@@ -56,7 +53,7 @@ fn main() {
             }
             last_instruction_instant = Instant::now(); // Instant refresh
         }
-        
+
         //display clock
         if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) {
             window.update_with_buffer(&chip8.cpu.vram().to_screen_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT).unwrap();
