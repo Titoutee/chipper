@@ -24,9 +24,9 @@ fn main() {
     window.set_title("CHIP-8 Emulator");
 
     let mut last_keyboard_instant = Instant::now();
-    let kb_epsilon = 200;
+    let kb_epsilon = 100;
     let mut last_instruction_instant = Instant::now();
-    let instruction_epsilon = 2;
+    let instruction_epsilon = 3;
     let mut last_display_instant = Instant::now();
     let display_epsilon = 10;
 
@@ -55,7 +55,7 @@ fn main() {
         }
 
         //display clock
-        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) {
+        if Instant::now() - last_display_instant > Duration::from_millis(display_epsilon) || chip8.vram_changed() {
             window.update_with_buffer(&chip8.cpu.vram().to_screen_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT).unwrap();
             last_display_instant = Instant::now(); // Instant refresh
         }

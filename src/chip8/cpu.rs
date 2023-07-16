@@ -75,9 +75,7 @@ impl CPU {
         let instruction = self
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
-        //println!("{:04X?}", instruction);
         if Instant::now() - self.last_timer_change >= Duration::from_millis(TIMER_EPSILON) {
-            println!("Timer decrease!");
             self.decrease_delaytimer();
             self.decrease_soundtimer();
             self.last_timer_change = Instant::now();
