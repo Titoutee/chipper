@@ -109,22 +109,16 @@ impl CPU {
         let x = ((instruction & 0x0F00) >> 8) as usize;
         let y = ((instruction & 0x00F0) >> 4) as usize;
 
-        //println!("Instruction: {:04X?}, nibbled: nnn: {:X?}, kk: {:X?}, n: {:X?}, x: {:X?}, y: {:X?}", instruction, nnn, kk, n, x, y);
-        if x > 0xF || y > 0xF {
-            // Vx regs are 16 long
-            panic!("Ill-formed given x and y indexes...");
-        }
-
         let first_bit = ((instruction & 0xF000) >> 12) as u8;
 
         match first_bit {
-            0x0 => match kk {
-                0xE0 => {
+            0x0 => match nnn {
+                0x0E0 => {
                     self.vram.clear(); // CLEAR screen
                     self.registers.pc += 2;
                 }
 
-                0xEE => {
+                0x0EE => {
                     // RET
                     self.registers.pc = self
                         .stack
@@ -196,26 +190,26 @@ impl CPU {
                     }
                     0x5 => {
                         // Wrapping substraction, VF = BORROW
-                        let of = (self.registers.v[x] > self.registers.v[y]) as u8;
+                        let of = if self.registers.v[x] >= self.registers.v[y] {1} else {0};
                         self.registers.v[x] = self.registers.v[x].wrapping_sub(self.registers.v[y]);
                         self.registers.v[0xF] = of;
                     }
                     0x6 => {
                         // VF = Vx LSb, Vx /= 2
                         let lsb = self.registers.v[x] & 0b1; // LSb
-                        self.registers.v[x] >>= 1;
+                        self.registers.v[x] = self.registers.v[y]>>1;
                         self.registers.v[0xF] = lsb
                     }
                     0x7 => {
                         // Wrapping substraction, VF = BORROW
-                        let of = (self.registers.v[y] > self.registers.v[x]) as u8;
+                        let of = if self.registers.v[y] >= self.registers.v[x] {1} else {0};
                         self.registers.v[x] = self.registers.v[y].wrapping_sub(self.registers.v[x]);
                         self.registers.v[0xF] = of;
                     }
                     0xE => {
                         // VF = Vx MSb, Vx *= 2
-                        let msb = (self.registers.v[x] & 0b10000000)>>7; // MSb (aka 128)
-                        self.registers.v[x] <<= 1;
+                        let msb = (self.registers.v[x]>>7) & 0b1; // MSb
+                        self.registers.v[x] = self.registers.v[y]<<1;
                         self.registers.v[0xF] = msb;
                     }
                     _ => {
@@ -253,7 +247,7 @@ impl CPU {
                     .read_segment(n as usize, self.registers.i as usize)
                     .expect("Segment is not contained in RAM (entirely)");
                 let sprite = Sprite::try_from(sprite_bytes).expect("Sprite data size is invalid");
-                self.registers.v[0xF] = self.vram.put_sprite(sprite, x.into(), y.into()) as u8;
+                self.registers.v[0xF] = self.vram.put_sprite(sprite, x.into(), y.into());
                 self.vram_changed = true;
                 self.registers.pc += 2;
             }

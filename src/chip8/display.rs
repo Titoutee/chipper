@@ -102,27 +102,28 @@ impl Vram {
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize) -> bool {
-        let collision = false;
+        let mut collision = false;
         if let Some(pixel_ref) = self.get_pixel_mut(x, y) {
             // We ignore the pixel setting if the pixel is not in bounds
-            let collision = *pixel_ref > 0;
+            collision = *pixel_ref == 1;
             *pixel_ref = if collision { 0 } else { 1 };
         }
         collision
     }
 
-    pub fn put_sprite(&mut self, sprite: Sprite, x: usize, y: usize) -> bool {
-        // true, cpu knows it has to change VF
-        let mut collision = false;
+    pub fn put_sprite(&mut self, sprite: Sprite, x: usize, y: usize) -> u8 {
+        // true, cpu knows it has to change VF (directly funneled to VF)
+        let mut collision = 0;
         for (i, line) in sprite.to_bytes_iter().enumerate() {
-            let bits = bits_from_u8(*line);
-            for (j, bit) in bits.iter().enumerate() {
+            for (j, bit) in bits_from_u8(*line).iter().enumerate() {
                 if *bit {
-                    collision = self.set_pixel(x + j, y + i);
+                    if self.set_pixel(x + j, y + i) {
+                        collision+=1;
+                    }
                 }
             }
         }
-        collision
+        if collision > 0 {1} else {0}
     }
 }
 
