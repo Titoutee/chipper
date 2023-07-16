@@ -56,10 +56,6 @@ impl Vram {
         self.arr
     }
 
-    pub fn flattened_idx(&self, x: usize, y: usize) -> usize {
-        VRAM_WIDTH * y + x
-    }
-
     pub fn to_screen_buffer(&self) -> Vec<u32> {
         let mut buffer = vec![0; SCREEN_HEIGHT * SCREEN_WIDTH];
         for y in 0..SCREEN_HEIGHT {
@@ -69,7 +65,7 @@ impl Vram {
                 let pixel = self.get_pixel(x_vram_coord, y_vram_coord).unwrap();
                 let color = match *pixel {
                     0 => 0x0,
-                    1 => 0xffffff,
+                    1 => 0xFFFF,
                     _ => panic!("Unknown colour"),
                 };
                 buffer[y * SCREEN_WIDTH + x] = color;
