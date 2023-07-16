@@ -1,5 +1,5 @@
 use core::panic;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use super::display::{Sprite, Vram};
 use super::font::FONT_UNIT_SIZE;
@@ -67,6 +67,7 @@ impl CPU {
     pub fn load_rom(&mut self, rom: Vec<u8>) {
         self.mem.load_rom(rom);
     }
+    
     pub fn tick(&mut self, kb: &KeyBoard) -> CpuState {
         self.vram_changed = false;
         if self.registers.pc as usize >= RAM_SIZE {
@@ -188,26 +189,34 @@ impl CPU {
                     }
                     0x5 => {
                         // Wrapping substraction, VF = BORROW
-                        let of = if self.registers.v[x] >= self.registers.v[y] {1} else {0};
+                        let of = if self.registers.v[x] >= self.registers.v[y] {
+                            1
+                        } else {
+                            0
+                        };
                         self.registers.v[x] = self.registers.v[x].wrapping_sub(self.registers.v[y]);
                         self.registers.v[0xF] = of;
                     }
                     0x6 => {
                         // VF = Vx LSb, Vx /= 2
                         let lsb = self.registers.v[x] & 0b1; // LSb
-                        self.registers.v[x] = self.registers.v[y]>>1;
+                        self.registers.v[x] >>= 1;
                         self.registers.v[0xF] = lsb
                     }
                     0x7 => {
                         // Wrapping substraction, VF = BORROW
-                        let of = if self.registers.v[y] >= self.registers.v[x] {1} else {0};
+                        let of = if self.registers.v[y] >= self.registers.v[x] {
+                            1
+                        } else {
+                            0
+                        };
                         self.registers.v[x] = self.registers.v[y].wrapping_sub(self.registers.v[x]);
                         self.registers.v[0xF] = of;
                     }
                     0xE => {
                         // VF = Vx MSb, Vx *= 2
-                        let msb = (self.registers.v[x]>>7) & 0b1; // MSb
-                        self.registers.v[x] = self.registers.v[y]<<1;
+                        let msb = self.registers.v[x] >> 7; // MSb: 1 or 0
+                        self.registers.v[x] <<= 1;
                         self.registers.v[0xF] = msb;
                     }
                     _ => {
