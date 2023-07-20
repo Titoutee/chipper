@@ -7,7 +7,7 @@ roms repo which follows: https://github.com/esperz2019/chip8-roms
 
 To launch a game, simply run `cargo run roms/some_game`, or any other
 path if you decided to add some roms. Running `cargo run` without
-any argument will simply run the `tetris` game give nwith the
+any argument will simply run the `tetris` game given with the
 interpreter.
 
 Have fun! :)
