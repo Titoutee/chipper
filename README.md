@@ -18,16 +18,23 @@ The interpreter uses an hexadecimal keyboard. I give here the exact key actions 
 
 # Tetris
 Rotate piece -> A
+
 Move right -> E
+
 Move left -> Z
+
 Accelerate downwards -> Q
 
 # Space invaders
+
 Move right -> E
+
 Move left -> A
+
 Skip menu | Fire -> Z
 
 # Landing
+
 Launch -> Z
 
 
