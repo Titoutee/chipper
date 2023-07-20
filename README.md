@@ -35,7 +35,7 @@ Skip menu | Fire -> Z
 
 # Landing
 
-Launch -> Z
+Launch -> S
 
 
 # Have fun! :)
