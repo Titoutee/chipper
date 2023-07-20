@@ -1,5 +1,5 @@
 //! Display API
-//! 
+
 pub type VramType = [[u8; VRAM_WIDTH]; VRAM_HEIGHT];
 
 pub const SPRITE_MAX_SIZE: usize = 15;

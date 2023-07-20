@@ -1,4 +1,5 @@
-//! Module exposing mechanisms linked to memory
+//! API exposing mem mechanisms
+//!
 use super::font::FONT_SET;
 
 const STACK_SIZE: usize = 16;
@@ -27,8 +28,8 @@ pub struct Stack {
 }
 
 impl Stack {
-    pub fn push(&mut self, val: u16) -> Option<()>/*FULL*/ {
-        if self.vec.len()+1 > STACK_SIZE {
+    pub fn push(&mut self, val: u16) -> Option<()> /*FULL*/ {
+        if self.vec.len() + 1 > STACK_SIZE {
             return None;
         }
 
@@ -36,7 +37,8 @@ impl Stack {
         Some(())
     }
 
-    pub fn pop(&mut self) -> Option<u16> { // Responsability of the caller to handle the empty stack
+    pub fn pop(&mut self) -> Option<u16> {
+        // Responsability of the caller to handle the empty stack
         self.vec.pop()
     }
 }
@@ -45,7 +47,6 @@ impl Default for Stack {
     fn default() -> Self {
         Self {
             vec: Vec::with_capacity(STACK_SIZE as usize),
-            //sp: 0,
         }
     }
 }
@@ -53,7 +54,7 @@ impl Default for Stack {
 #[derive(Debug)]
 /// Main memory unit
 pub struct Mem {
-    ram: [u8; RAM_SIZE], // Main RAM 
+    ram: [u8; RAM_SIZE], // Main RAM
     rom: Vec<u8>,        // Embedded instructions, wich will be included in RAM
 }
 
@@ -72,7 +73,7 @@ impl Mem {
         self.rom.as_slice()
     }
 
-    /// Load a (new) custom rom into the mem context (for "rom switching") 
+    /// Load a (new) custom rom into the mem context (for "rom switching")
     pub fn load_rom(&mut self, rom: Vec<u8>) {
         self.rom = rom;
         self.reset();
@@ -82,7 +83,8 @@ impl Mem {
     pub fn reset(&mut self) {
         // Sets rom -> loads the embedded rom into the actual ram
         for (i, byte) in self.rom.iter().enumerate() {
-            if i+ROM_BASE_ADDR<RAM_SIZE { // Still RAM available
+            if i + ROM_BASE_ADDR < RAM_SIZE {
+                // Still RAM available
                 self.ram[ROM_BASE_ADDR + i] = *byte;
             } else {
                 break; // RAM is full, the entire ROM can't be placed in
@@ -97,7 +99,7 @@ impl Mem {
     /// Reads the byte at the given address in ram
     pub fn read_byte(&self, addr: usize) -> Option<u8> {
         if addr >= RAM_SIZE {
-            return None
+            return None;
         }
         Some(self.ram[addr])
     }
@@ -113,18 +115,18 @@ impl Mem {
     pub fn read_segment(&self, n_bytes: usize, addr: usize) -> Option<Vec<u8>> {
         let mut segment = Vec::<u8>::new();
         for offset in 0..n_bytes {
-            segment.push(self.read_byte(addr+offset)?);
+            segment.push(self.read_byte(addr + offset)?);
         }
         Some(segment)
-    }  
-    
+    }
+
     /// Reads a complete word (2-byte in CHIP-8) from ram beginning at addr
     // Two consecutive regs (addr and addr + 1) are OR'd and yield a new u16
     pub fn read_word(&self, addr: usize) -> Option<u16> {
         if addr >= RAM_SIZE || addr + 1 >= RAM_SIZE {
-            return None
+            return None;
         }
-        Some(((self.ram[addr] as u16) << 8) | (self.ram[addr+1] as u16))
+        Some(((self.ram[addr] as u16) << 8) | (self.ram[addr + 1] as u16))
     }
 }
 
@@ -171,7 +173,7 @@ mod tests {
         Mem::new(vec![])
     }
 
-    fn mem_setup_filled(rom: Vec<u8>) -> Mem{
+    fn mem_setup_filled(rom: Vec<u8>) -> Mem {
         Mem::new(rom)
     }
 
@@ -199,7 +201,7 @@ mod tests {
     #[should_panic]
     fn word_read_invalid() {
         let invalid_addr = 4096;
-        let mem = mem_setup_filled(vec![4, 4, 3, 4]); 
+        let mem = mem_setup_filled(vec![4, 4, 3, 4]);
         assert_eq!(mem.read_word(invalid_addr).expect("out of bounds"), 61584);
     }
 

@@ -1,3 +1,5 @@
+//! API exposing input mechanisms through a keyboard abstraction
+
 use minifb::Key;
 
 pub struct KeyBoard {

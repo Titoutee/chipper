@@ -1,4 +1,4 @@
-use core::panic;
+//! API exposing processor mechanisms (instrution fetching, decoding and executing)
 use std::time::{Duration, Instant};
 
 use super::display::{Sprite, Vram};
@@ -20,7 +20,6 @@ pub struct CPU {
     mem: Mem,
     // Vram
     vram: Vram,
-    vram_changed: bool,
 }
 
 pub enum CpuState {
@@ -37,14 +36,9 @@ impl CPU {
             stack: Stack::default(),
             vram: Vram::default(),
             mem,
-            vram_changed: false,
         };
         cpu.reset(); // Just for mem and pc reinit.
         cpu
-    }
-
-    pub fn vram_changed(&self) -> bool {
-        self.vram_changed
     }
 
     pub fn vram(&self) -> &Vram {
@@ -57,7 +51,6 @@ impl CPU {
         self.stack = Stack::default();
         self.vram = Vram::default();
         self.mem.reset();
-        self.vram_changed = false;
         self.registers = Registers {
             pc: memory::ROM_BASE_ADDR as u16,
             ..Default::default() // other are default
@@ -69,19 +62,18 @@ impl CPU {
     }
     
     pub fn tick(&mut self, kb: &KeyBoard) -> CpuState {
-        self.vram_changed = false;
         if self.registers.pc as usize >= RAM_SIZE {
             return CpuState::Finished;
         }
         let instruction = self
             .fetch(self.registers.pc)
             .expect("Out of bounds word reading");
-        if Instant::now() - self.last_timer_change >= Duration::from_millis(TIMER_EPSILON) {
+        if Instant::now() - self.last_timer_change >= Duration::from_millis(TIMER_EPSILON) { // 60 Hz appr.
             self.decrease_delaytimer();
             self.decrease_soundtimer();
             self.last_timer_change = Instant::now();
         }
-        self.execute(instruction, kb)
+        self.run(instruction, kb)
     }
 
     pub fn fetch(&self, pc: u16) -> Option<u16> {
@@ -100,7 +92,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instruction: u16, kb: &KeyBoard) -> CpuState {
+    pub fn run(&mut self, instruction: u16, kb: &KeyBoard) -> CpuState {
         //Nibbling
         let nnn = instruction & 0x0FFF;
         let kk = (instruction & 0x00FF) as u8;
@@ -121,7 +113,7 @@ impl CPU {
                     // RET
                     self.registers.pc = self
                         .stack
-                        .pop()
+                        .pop() // Pop last saved address
                         .expect("Stack was empty already, ill-formed function nesting")
                 }
 
@@ -255,7 +247,6 @@ impl CPU {
                     .expect("Segment is not contained in RAM (entirely)");
                 let sprite = Sprite::try_from(sprite_bytes).expect("Sprite data size is invalid");
                 self.registers.v[0xF] = self.vram.put_sprite(sprite, x.into(), y.into());
-                self.vram_changed = true;
                 self.registers.pc += 2;
             }
             0xE => match kk {
@@ -407,6 +398,6 @@ mod test {
     #[test]
     fn nibbling() {
         let mut cpu = cpu_setup();
-        cpu.execute(0xF0E0, &KeyBoard::new());
+        cpu.run(0xF0E0, &KeyBoard::new());
     }
 }

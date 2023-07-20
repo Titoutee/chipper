@@ -1,10 +1,11 @@
+//!Main chip8 API mod
+
 pub mod cpu;
 pub mod display;
 pub mod font;
 pub mod input;
 pub mod memory;
 
-//use minifb::Key;
 use cpu::{CPU, CpuState};
 use input::KeyBoard;
 use self::memory::Mem;
@@ -33,9 +34,5 @@ impl Interpreter {
 
     pub fn tick(&mut self) -> CpuState {
         self.cpu.tick(&self.keyboard)
-    }
-
-    pub fn vram_changed(&self) -> bool {
-        self.cpu.vram_changed()
     }
 }
