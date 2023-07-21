@@ -14,7 +14,7 @@ interpreter.
 
 # Keyboard layout
 
-The interpreter uses an hexadecimal keyboard. I give here the exact key actions (on a french kb) for the 3 roms included.
+The interpreter uses a hexadecimal keyboard. I give here the exact key actions (on a french kb) for the 3 roms included.
 
 # Tetris
 Rotate piece -> A
