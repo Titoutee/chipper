@@ -1,3 +1,5 @@
+# Chipper
+
 This personal project puts forward an implementation of the famous
 CHIP-8 interpreter, proposing a virtual machine (based on a regular
 Von Neumann arch) on and thanks to which ops are run.
